@@ -34,6 +34,8 @@ from fairseq.model_parallel.megatron_trainer import MegatronTrainer
 from fairseq.trainer import Trainer
 from omegaconf import DictConfig, OmegaConf
 
+from fairseq.data.encoders.gpt2_bpe import get_encoder
+
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -281,7 +283,26 @@ def train(
     should_stop = False
     num_updates = trainer.get_num_updates()
     logger.info("Start iterating over samples")
+    encoder = get_encoder("gpt2_bpe/encoder.json", "gpt2_bpe/vocab.bpe")
     for i, samples in enumerate(progress):
+        # print(samples[0]['net_input']['src_tokens'][0].shape)
+        # print(encoder.decode(samples[0]['net_input']['src_tokens'][0].tolist()))
+        # target = samples[0]['target'][0]
+        tokens = samples[0]['net_input']['src_tokens'][0]
+        # print((target!=1).nonzero(as_tuple=True))
+        # print((tokens==50264).nonzero(as_tuple=True))
+        # recover_tokens = tokens.tolist()
+        # for index in (target!=1).nonzero(as_tuple=True)[0].tolist():
+        #     recover_tokens[index] = target[index].item()
+        # recover_tokens = torch.tensor(recover_tokens)
+        # print(recover_tokens.shape)
+        # recover_tokens = src_dict.string(recover_tokens).split(' ')
+        # print(recover_tokens)
+        # recover_tokens = list(map(int, recover_tokens))
+        # print(encoder.decode(recover_tokens))
+        for k in range(len(samples)):
+            print(samples[k]['net_input']['src_tokens'].shape)
+        quit()
         with metrics.aggregate("train_inner"), torch.autograd.profiler.record_function(
             "train_step-%d" % i
         ):
@@ -491,7 +512,6 @@ def cli_main(
     if cfg.common.use_plasma_view:
         server = PlasmaStore(path=cfg.common.plasma_path)
         logger.info(f"Started plasma server pid {server.server.pid} {cfg.common.plasma_path}")
-
     if args.profile:
         with torch.cuda.profiler.profile():
             with torch.autograd.profiler.emit_nvtx():
