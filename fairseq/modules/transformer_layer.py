@@ -12,6 +12,7 @@ from fairseq.modules import LayerNorm, MultiheadAttention
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
 from torch import Tensor
+from fairseq.modules import BaseLayer
 
 
 class TransformerEncoderLayer(nn.Module):
@@ -51,18 +52,21 @@ class TransformerEncoderLayer(nn.Module):
             float(activation_dropout_p), module_name=self.__class__.__name__
         )
         self.normalize_before = args.encoder_normalize_before
-        self.fc1 = self.build_fc1(
-            self.embed_dim,
-            args.encoder_ffn_embed_dim,
-            self.quant_noise,
-            self.quant_noise_block_size,
-        )
-        self.fc2 = self.build_fc2(
-            args.encoder_ffn_embed_dim,
-            self.embed_dim,
-            self.quant_noise,
-            self.quant_noise_block_size,
-        )
+        if getattr(self.args, "base_layers", 0) == 0:
+            self.fc1 = self.build_fc1(
+                self.embed_dim,
+                args.encoder_ffn_embed_dim,
+                self.quant_noise,
+                self.quant_noise_block_size,
+            )
+            self.fc2 = self.build_fc2(
+                args.encoder_ffn_embed_dim,
+                self.embed_dim,
+                self.quant_noise,
+                self.quant_noise_block_size,
+            )
+        else:
+            self.expert = BaseLayer(args)
 
         self.final_layer_norm = LayerNorm(self.embed_dim)
 
@@ -146,9 +150,12 @@ class TransformerEncoderLayer(nn.Module):
         residual = x
         if self.normalize_before:
             x = self.final_layer_norm(x)
-        x = self.activation_fn(self.fc1(x))
-        x = self.activation_dropout_module(x)
-        x = self.fc2(x)
+        if getattr(self.args, "base_layers", 0) == 0:
+            x = self.activation_fn(self.fc1(x))
+            x = self.activation_dropout_module(x)
+            x = self.fc2(x)
+        else:
+            x = self.expert(x)[0]
         x = self.dropout_module(x)
         x = self.residual_connection(x, residual)
         if not self.normalize_before:

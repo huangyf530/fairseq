@@ -184,6 +184,25 @@ class RobertaModel(FairseqEncoderModel):
                 "--offload-activations are passed."
             )
         )
+        # config for "BASE Layers: Simplifying Training of Large, Sparse Models"
+        parser.add_argument(
+            "--base-layers",
+            type=int,
+            default=0,
+            help="number of BASE layers in total"
+        )
+        parser.add_argument(
+            "--base-sublayers",
+            type=int,
+            default=1,
+            help="number of sublayers in each BASE layer (number of experts)"
+        )
+        parser.add_argument(
+            "--base-shuffle",
+            type=int,
+            default=1,
+            help="shuffle tokens between workers before computing assignment"
+        )
 
     @classmethod
     def build_model(cls, args, task):

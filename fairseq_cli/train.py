@@ -289,7 +289,7 @@ def train(
         # print(samples[0]['net_input']['src_tokens'][0].shape)
         # print(encoder.decode(samples[0]['net_input']['src_tokens'][0].tolist()))
         # target = samples[0]['target'][0]
-        tokens = samples[0]['net_input']['src_tokens'][0]
+        # tokens = samples[0]['net_input']['src_tokens'][0]
         # print((target!=1).nonzero(as_tuple=True))
         # print((tokens==50264).nonzero(as_tuple=True))
         # recover_tokens = tokens.tolist()
@@ -301,14 +301,36 @@ def train(
         # print(recover_tokens)
         # recover_tokens = list(map(int, recover_tokens))
         # print(encoder.decode(recover_tokens))
-        for k in range(len(samples)):
-            print(samples[k]['net_input']['src_tokens'].shape)
+        # for k in range(len(samples)):
+        #     print(samples[k]['net_input']['src_tokens'].shape)
+        # quit()
+        # for sample in samples:
+        #     if sample['net_input']['src_tokens'].shape[1] > 512:
+        #         print(sample)
+                # recover_tokens = sample['net_input']['src_tokens'][3]
+                # recover_tokens = task.dictionary.string(recover_tokens).split(' ')
+                # recover_ids = []
+                # for token in recover_tokens:
+                #     try:
+                #         recover_ids.append(int(token))
+                #     except ValueError as e:
+                #         recover_ids.append(token)
+                # print(encoder.decode(recover_ids))
+        # print(task.datasets['train'][3772837])
+        recover_tokens = task.datasets['train'][3616622]['net_input.src_tokens']
+        recover_tokens = task.dictionary.string(recover_tokens).split(' ')
+        recover_ids = []
+        for token in recover_tokens:
+            try:
+                recover_ids.append(int(token))
+            except ValueError as e:
+                recover_ids.append(token)
+        print(encoder.decode(recover_ids))
         quit()
         with metrics.aggregate("train_inner"), torch.autograd.profiler.record_function(
             "train_step-%d" % i
         ):
             log_output = trainer.train_step(samples)
-
         if log_output is not None:  # not OOM, overflow, ...
             # log mid-epoch stats
             num_updates = trainer.get_num_updates()

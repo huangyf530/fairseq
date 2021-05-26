@@ -134,3 +134,8 @@ experimental/*
 
 # Weights and Biases logs
 wandb/
+
+# bpe
+gpt2_bpe/
+tools/
+wikitext-103-raw/
