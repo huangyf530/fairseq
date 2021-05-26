@@ -284,7 +284,6 @@ def train(
     should_stop = False
     num_updates = trainer.get_num_updates()
     logger.info("Start iterating over samples")
-    encoder = get_encoder("gpt2_bpe/encoder.json", "gpt2_bpe/vocab.bpe")
     for i, samples in enumerate(progress):
         # print(samples[0]['net_input']['src_tokens'][0].shape)
         # print(encoder.decode(samples[0]['net_input']['src_tokens'][0].tolist()))
@@ -316,17 +315,6 @@ def train(
                 #     except ValueError as e:
                 #         recover_ids.append(token)
                 # print(encoder.decode(recover_ids))
-        # print(task.datasets['train'][3772837])
-        recover_tokens = task.datasets['train'][3616622]['net_input.src_tokens']
-        recover_tokens = task.dictionary.string(recover_tokens).split(' ')
-        recover_ids = []
-        for token in recover_tokens:
-            try:
-                recover_ids.append(int(token))
-            except ValueError as e:
-                recover_ids.append(token)
-        print(encoder.decode(recover_ids))
-        quit()
         with metrics.aggregate("train_inner"), torch.autograd.profiler.record_function(
             "train_step-%d" % i
         ):
