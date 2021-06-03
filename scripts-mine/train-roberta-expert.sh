@@ -9,7 +9,7 @@ UPDATE_FREQ=32          # Increase the batch size 32x
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 # export NCCL_DEBUG=INFO
 
-DATA_DIR=data-bin/wikitext-103
+DATA_DIR=data-bin/bert-corpus
 SAVE_DIR=checkpoints/roberta-expert
 TENSORBOARD_DIR=$SAVE_DIR/tensorboard
 LOG_FILE=$SAVE_DIR/train.log
@@ -28,7 +28,7 @@ python fairseq_cli/train.py --fp16 --fp16-init-scale 8 $DATA_DIR \
     --batch-size $MAX_SENTENCES --update-freq $UPDATE_FREQ \
     --max-update $TOTAL_UPDATES \
     --log-format simple --log-interval 10 $LOG_ARGS \
-    --save-dir $SAVE_DIR --save-interval-updates 10 --keep-interval-updates 3 \
+    --save-dir $SAVE_DIR --save-interval-updates 1000 --keep-interval-updates 3 \
     --base-layers 12 --base-sublayers 1 \
-    --validate-interval-updates 10 --skip-invalid-size-inputs-valid-test \
+    --validate-interval-updates 500 --skip-invalid-size-inputs-valid-test \
     --ddp-backend legacy_ddp --fp16-no-flatten-grads
