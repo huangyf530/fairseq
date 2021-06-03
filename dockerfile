@@ -3,6 +3,6 @@ FROM nvcr.io/nvidia/pytorch:20.12-py3
 # RUN apt-get update && apt-get install -y g++
 COPY . /fairseq
 WORKDIR /fairseq
-RUN pip install --editable ./
+RUN pip install --editable ./ && pip install numpy==1.20.0
 WORKDIR /workspace
 CMD /bin/bash
