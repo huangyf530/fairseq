@@ -154,10 +154,10 @@ class TransformerEncoderLayer(nn.Module):
             x = self.activation_fn(self.fc1(x))
             x = self.activation_dropout_module(x)
             x = self.fc2(x)
+            x = self.dropout_module(x)
+            x = self.residual_connection(x, residual)
         else:
             x = self.expert(x)[0]
-        x = self.dropout_module(x)
-        x = self.residual_connection(x, residual)
         if not self.normalize_before:
             x = self.final_layer_norm(x)
         return x
