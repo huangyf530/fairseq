@@ -27,7 +27,7 @@ python fairseq_cli/train.py --fp16 --fp16-init-scale 8 $DATA_DIR \
     --dropout 0.1 --attention-dropout 0.1 --weight-decay 0.01 \
     --batch-size $MAX_SENTENCES --update-freq $UPDATE_FREQ \
     --max-update $TOTAL_UPDATES \
-    --log-format simple --log-interval 1 $LOG_ARGS \
+    --log-format simple --log-interval 10 $LOG_ARGS \
     --save-dir $SAVE_DIR --save-interval-updates 1000 --keep-interval-updates 3 \
     --base-layers 1 --base-sublayers 1 \
     --validate-interval-updates 500 --skip-invalid-size-inputs-valid-test \
