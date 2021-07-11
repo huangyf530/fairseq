@@ -6,7 +6,7 @@ TOKENS_PER_SAMPLE=512   # Max sequence length
 MAX_POSITIONS=512       # Num. positional embeddings (usually same as above)
 MAX_SENTENCES=4        # Number of sequences per batch (batch size)
 UPDATE_FREQ=32          # Increase the batch size 32x
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+# export CUDA_VISIBLE_DEVICES=0,1,2,3
 # export NCCL_DEBUG=INFO
 
 DATA_DIR=data-bin/bert-corpus
@@ -16,7 +16,7 @@ LOG_FILE=$SAVE_DIR/train.log
 LOG_ARGS="--log-file $LOG_FILE --tensorboard-logdir $TENSORBOARD_DIR"
 
 echo "[Fairseq] Build c++ extensible..."
-python setup.py build_ext --inplace
+# python setup.py build_ext --inplace
 mkdir -p $SAVE_DIR
 echo "[Fairseq] Begin Training ..."
 python fairseq_cli/train.py --fp16 --fp16-init-scale 8 $DATA_DIR \
@@ -27,7 +27,7 @@ python fairseq_cli/train.py --fp16 --fp16-init-scale 8 $DATA_DIR \
     --dropout 0.1 --attention-dropout 0.1 --weight-decay 0.01 \
     --batch-size $MAX_SENTENCES --update-freq $UPDATE_FREQ \
     --max-update $TOTAL_UPDATES \
-    --log-format simple --log-interval 10 $LOG_ARGS \
+    --log-format simple --log-interval 1 $LOG_ARGS \
     --save-dir $SAVE_DIR --save-interval-updates 1000 --keep-interval-updates 3 \
     --base-layers 1 --base-sublayers 1 \
     --validate-interval-updates 500 --skip-invalid-size-inputs-valid-test \

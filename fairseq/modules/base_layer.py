@@ -40,6 +40,7 @@ class BaseLayer(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.num_workers = distributed_utils.get_data_parallel_world_size()
+        self.isdecoder = hasattr(args, "decoder_embed_dim")
         embed_dim = args.decoder_embed_dim if hasattr(args, "decoder_embed_dim") else args.encoder_embed_dim
         expert_centroids = torch.empty(self.num_workers, embed_dim)
         torch.nn.init.orthogonal_(expert_centroids, gain=0.1)
@@ -105,9 +106,11 @@ class BaseLayer(nn.Module):
         if self.shuffle and is_training:
             # Undo shuffling
             result = All2All.apply(result, output_splits_list, input_splits_list)[self.inverse_sort(shuffle_sort)]
-
-        # Return additional Nones for compatibility with TransformerDecoderLayer
-        return result.view(input_features.size()), None, None
+        if self.isdecoder:
+            # Return additional Nones for compatibility with TransformerDecoderLayer
+            return result.view(input_features.size()), None, None
+        else:
+            return result.view(input_features.size())
 
     def inverse_sort(self, order):
         # Creates an index that undoes a sort: xs==xs[order][inverse_sort(order)]
