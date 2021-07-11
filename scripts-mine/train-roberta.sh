@@ -11,22 +11,22 @@ UPDATE_FREQ=64          # Increase the batch size 16x
 # export CUDA_LAUNCH_BLOCKING=1
 export WANDB_API_KEY=2f567206226adcf81123cd10d9b95c4446e29dba
 
-ROOT_DIR=/workspace/fairseq
+ROOT_DIR=/home/huangyufei/moe-fairseq/fairseq
 cd $ROOT_DIR
 DATA_DIR=$ROOT_DIR/data-bin/bert-corpus
-SAVE_DIR=$ROOT_DIR/checkpoints/roberta-test
+SAVE_DIR=$ROOT_DIR/checkpoints/roberta-expert-test
 TENSORBOARD_DIR=$SAVE_DIR/tensorboard
 LOG_FILE=$SAVE_DIR/train.log
 LOG_ARGS="--log-file $LOG_FILE --wandb-project roberta --tensorboard-logdir $TENSORBOARD_DIR"
 
-echo "pip install dependencies..."
-pip install --editable ./
-pip install numpy==1.20.0
-pip install tensorboard
+# echo "pip install dependencies..."
+# pip install --editable ./
+# pip install numpy==1.20.0
+# pip install tensorboard
 
-echo "begin training..."
+echo "[Fairseq] Begin Training ..."
 mkdir -p $SAVE_DIR
-python train.py --fp16 --fp16-init-scale 8 $DATA_DIR \
+python fariseq_cli/train.py --fp16 --fp16-init-scale 8 $DATA_DIR \
     --task masked_lm --criterion masked_lm \
     --arch roberta_base --sample-break-mode complete --tokens-per-sample $TOKENS_PER_SAMPLE \
     --optimizer adam --adam-betas '(0.9,0.98)' --adam-eps 1e-6 --clip-norm 0.0 \
