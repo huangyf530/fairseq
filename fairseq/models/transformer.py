@@ -406,6 +406,12 @@ class TransformerEncoder(FairseqEncoder):
             self.layer_norm = LayerNorm(embed_dim)
         else:
             self.layer_norm = None
+        num_base_layers = getattr(args, "base_layers", 0)
+        for i in range(num_base_layers):
+            self.layers.insert(
+                ((i + 1) * args.encoder_layers) // (num_base_layers + 1),
+                BaseLayer(args),
+            )
 
     def build_encoder_layer(self, args):
         layer = TransformerEncoderLayer(args)
