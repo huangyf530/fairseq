@@ -409,7 +409,7 @@ class TransformerEncoder(FairseqEncoder):
         num_base_layers = getattr(args, "base_layers", 0)
         for i in range(num_base_layers):
             self.layers.insert(
-                ((i + 1) * args.encoder_layers) // (num_base_layers + 1),
+                ((i + 1) * args.encoder_layers) // (num_base_layers + 1) + i,
                 BaseLayer(args),
             )
 
@@ -774,7 +774,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         num_base_layers = getattr(args, "base_layers", 0)
         for i in range(num_base_layers):
             self.layers.insert(
-                ((i + 1) * args.decoder_layers) // (num_base_layers + 1),
+                ((i + 1) * args.decoder_layers) // (num_base_layers + 1) + i,
                 BaseLayer(args),
             )
 
