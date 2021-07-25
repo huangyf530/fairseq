@@ -92,7 +92,7 @@ class BaseLayer(nn.Module):
         if not is_training:
             # count load balance in valid dataset
             my_token_num = routed_features.shape[0]
-            each_token_num = torch.zero(self.num_workers, dtype=torch.int64, device=features.device)
+            each_token_num = torch.zeros(self.num_workers, dtype=torch.int64, device=features.device)
             each_token_num[self.expert_id] = my_token_num
             torch.distributed.all_reduce(each_token_num, op=torch.distributed.ReduceOp.SUM)
             self.each_expert_count += each_token_num.to(self.each_expert_count.device)
