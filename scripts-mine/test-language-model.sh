@@ -1,8 +1,7 @@
 #!/bin/bash
 TOKENS_PER_SAMPLE=512   # Max sequence length
 MAX_POSITIONS=512       # Num. positional embeddings (usually same as above)
-MAX_SENTENCES=8        # Number of sequences per batch (batch size)
-UPDATE_FREQ=16          # Increase the batch size 16x
+MAX_SENTENCES=16        # Number of sequences per batch (batch size)
 
 ROOT_DIR=/workspace
 cd $ROOT_DIR
@@ -20,7 +19,8 @@ echo "[Eval] begin elvaluate..."
 python validate.py $DATA_DIR \
     --task language_modeling \
     --tokens-per-sample $TOKENS_PER_SAMPLE --sample-break-mode none \
+    --distributed-world-size 2 \
     --batch-size $MAX_SENTENCES \
-    --log-format simple --log-interval 50 \
+    --log-format simple --log-interval 1 \
     --path $MODEL_PATH \
     --skip-invalid-size-inputs-valid-test

@@ -56,6 +56,8 @@ def main(cfg: DictConfig, override_args=None):
         overrides = None
 
     # Load ensemble
+    if cfg.checkpoint.load_checkpoint_on_all_dp_ranks:
+        cfg.checkpoint.checkpoint_suffix = f"-rank-{cfg.distributed_training.distributed_rank}"
     logger.info("loading model(s) from {}".format(cfg.common_eval.path))
     models, saved_cfg, task = checkpoint_utils.load_model_ensemble_and_task(
         [cfg.common_eval.path],
@@ -113,6 +115,8 @@ def main(cfg: DictConfig, override_args=None):
 
         log_outputs = []
         for i, sample in enumerate(progress):
+            if len(sample) == 0:
+                continue
             sample = utils.move_to_cuda(sample) if use_cuda else sample
             _loss, _sample_size, log_output = task.valid_step(sample, model, criterion)
             progress.log(log_output, step=i)
@@ -146,7 +150,6 @@ def main(cfg: DictConfig, override_args=None):
 def cli_main():
     parser = options.get_validation_parser()
     args = options.parse_args_and_arch(parser)
-
     # only override args that are explicitly given on the command line
     override_parser = options.get_validation_parser()
     override_args = options.parse_args_and_arch(
