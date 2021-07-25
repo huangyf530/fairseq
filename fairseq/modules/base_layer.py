@@ -50,6 +50,7 @@ class BaseLayer(nn.Module):
         self.shuffle = args.base_shuffle
         self.cpp = self.load_assignment()
         # self.cnt = 0
+        self.each_expert_count = torch.zeros(self.num_workers, dtype=torch.int64)
 
         # Add a special attribute to the expert parameters, so we know not to sync their gradients
         for param in self.expert_network.parameters():
@@ -85,14 +86,16 @@ class BaseLayer(nn.Module):
         # Compute which token goes to which expert
         sort_by_expert, input_splits, output_splits = self.balanced_assignment(token_expert_affinities) \
             if is_training else self.greedy_assignment(token_expert_affinities)
-        # if input_splits_list[0] != input_splits_list[-1]:
-        #     print(self.expert_id, "assignment", output_splits, input_splits)
 
         # Swap these tokens for the right ones for our expert
         routed_features = All2All.apply(features[sort_by_expert], output_splits, input_splits)
-        # if input_splits_list[0] != input_splits_list[-1]:
-        #     print(self.expert_id, "routed", routed_features.shape)
-        #     quit()
+        if not is_training:
+            # count load balance in valid dataset
+            my_token_num = routed_features.shape[0]
+            each_token_num = torch.zero(self.num_workers, dtype=torch.int64, device=features.device)
+            each_token_num[self.expert_id] = my_token_num
+            torch.distributed.all_reduce(each_token_num, op=torch.distributed.ReduceOp.SUM)
+            self.each_expert_count += each_token_num.to(self.each_expert_count.device)
 
         if routed_features.size(0) > 0:
             # Mix in the expert network based on how appropriate it is for these tokens

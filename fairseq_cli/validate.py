@@ -131,7 +131,17 @@ def main(cfg: DictConfig, override_args=None):
             log_output = agg.get_smoothed_values()
 
         progress.print(log_output, tag=subset, step=i)
-
+    if saved_cfg.model.base_layers >= 0:
+        if distributed_utils.is_master(cfg.distributed_training):
+            cnt = 0
+            for layer in model.decoder.layers:
+                if hasattr(layer, "expert"):
+                    cnt += 1
+                    each_expert_count = layer.each_expert_count.tolist()
+                    total = sum(each_token_num)
+                    print("Base layer {}:".format(cnt))
+                    for i, count in enumerate(each_expert_count):
+                        print("\texpert {}: {}".format(i, count / total))
 
 def cli_main():
     parser = options.get_validation_parser()
