@@ -123,12 +123,16 @@ def main(cfg: DictConfig, override_args=None):
             log_outputs.append(log_output)
 
         if data_parallel_world_size > 1:
+            print(data_parallel_rank, len(log_outputs))
+            torch.distributed.barrier()
+            logger.info("gather log output among different workers.")
             log_outputs = distributed_utils.all_gather_list(
                 log_outputs,
                 max_size=cfg.common.all_gather_list_size,
                 group=distributed_utils.get_data_parallel_group(),
             )
             log_outputs = list(chain.from_iterable(log_outputs))
+            logger.info("gather over.")
 
         with metrics.aggregate() as agg:
             task.reduce_metrics(log_outputs, criterion)
