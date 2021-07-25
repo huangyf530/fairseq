@@ -900,6 +900,13 @@ class CommonEvalConfig(FairseqDataclass):
     results_path: Optional[str] = field(
         default=None, metadata={"help": "path to save eval results (optional)"}
     )
+    load_checkpoint_on_all_dp_ranks: bool = field(
+        default=False,
+        metadata={
+            "help": "load checkpoints on all data parallel devices "
+            "(default: only load on rank 0 and broadcast to other devices)"
+        },
+    )
 
 
 @dataclass

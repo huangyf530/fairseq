@@ -29,6 +29,8 @@ logger = logging.getLogger("fairseq_cli.validate")
 def main(cfg: DictConfig, override_args=None):
     if isinstance(cfg, Namespace):
         cfg = convert_namespace_to_omegaconf(cfg)
+    print(cfg)
+    quit()
 
     utils.import_user_module(cfg.common)
 
@@ -56,7 +58,7 @@ def main(cfg: DictConfig, override_args=None):
         overrides = None
 
     # Load ensemble
-    if cfg.checkpoint.load_checkpoint_on_all_dp_ranks:
+    if cfg.common_eval.load_checkpoint_on_all_dp_ranks:
         cfg.checkpoint.checkpoint_suffix = f"-rank-{cfg.distributed_training.distributed_rank}"
     logger.info("loading model(s) from {}".format(cfg.common_eval.path))
     models, saved_cfg, task = checkpoint_utils.load_model_ensemble_and_task(
