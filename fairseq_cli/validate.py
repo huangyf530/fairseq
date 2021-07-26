@@ -89,7 +89,7 @@ def main(cfg: DictConfig, override_args=None):
             raise Exception("Cannot find dataset: " + subset)
 
         # Initialize data iterator
-        itr = task.get_batch_iterator(
+        batch_itr = task.get_batch_iterator(
             dataset=dataset,
             max_tokens=cfg.dataset.max_tokens,
             max_sentences=cfg.dataset.batch_size,
@@ -104,7 +104,8 @@ def main(cfg: DictConfig, override_args=None):
             shard_id=data_parallel_rank,
             num_workers=cfg.dataset.num_workers,
             data_buffer_size=cfg.dataset.data_buffer_size,
-        ).next_epoch_itr(shuffle=False)
+        )
+        itr = batch_itr.next_epoch_itr(shuffle=False)
         progress = progress_bar.progress_bar(
             itr,
             log_format=cfg.common.log_format,
@@ -112,11 +113,12 @@ def main(cfg: DictConfig, override_args=None):
             prefix=f"valid on '{subset}' subset",
             default_log_format=("tqdm" if not cfg.common.no_progress_bar else "simple"),
         )
+        _dummy_batch = batch_itr.first_batch
 
         log_outputs = []
         for i, sample in enumerate(progress):
             if len(sample) == 0:
-                continue
+                sample = _dummy_batch
             sample = utils.move_to_cuda(sample) if use_cuda else sample
             _loss, _sample_size, log_output = task.valid_step(sample, model, criterion)
             progress.log(log_output, step=i)
