@@ -5,11 +5,12 @@ wget -O gpt2_bpe/encoder.json https://dl.fbaipublicfiles.com/fairseq/gpt2_bpe/en
 wget -O gpt2_bpe/vocab.bpe https://dl.fbaipublicfiles.com/fairseq/gpt2_bpe/vocab.bpe
 fi
 for SPLIT in train valid test; do \
-    python -m examples.roberta.multiprocessing_bpe_encoder \
+    python encoder.py \
         --encoder-json gpt2_bpe/encoder.json \
         --vocab-bpe gpt2_bpe/vocab.bpe \
-        --inputs /home/huangyufei/disk3/OpenWebText/openwebtext-raw/openwebtext.${SPLIT}.tokens \
-        --outputs /home/huangyufei/disk3/OpenWebText/openwebtext-raw/openwebtext.${SPLIT}.bpe \
+        --inputs  /home/huangyufei/disk3/wikitext-103/wiki.${SPLIT}.tokens \
+        --outputs /home/huangyufei/disk3/wikitext-103/wiki.${SPLIT}.bpe \
+        --outputs-pos /home/huangyufei/disk3/wikitext-103/wiki.${SPLIT}.pos \
         --keep-empty \
-        --workers 60; \
+        --workers 50; \
 done

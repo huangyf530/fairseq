@@ -90,6 +90,9 @@ class LanguageModelingConfig(FairseqDataclass):
     pad_to_fixed_bsz: Optional[bool] = field(
         default=False, metadata={"help": "boolean to pad to fixed batch size"},
     )
+    add_pos: Optional[bool] = field(
+        default=False, metadata={'help': "boolean to add pos tag"}
+    )
 
     # TODO common vars below add to parent
     seed: int = II("common.seed")
@@ -134,10 +137,11 @@ class LanguageModelingTask(LegacyFairseqTask):
         :prog:
     """
 
-    def __init__(self, args, dictionary, output_dictionary=None, targets=None):
+    def __init__(self, args, dictionary, output_dictionary=None, targets=None, pos_dictionary=None):
         super().__init__(args)
         self.dictionary = dictionary
         self.output_dictionary = output_dictionary or dictionary
+        self.pos_dictionary = pos_dictionary
 
         if targets is None:
             targets = ["future"]
@@ -147,6 +151,7 @@ class LanguageModelingTask(LegacyFairseqTask):
     def setup_dictionary(cls, args, **kwargs):
         dictionary = None
         output_dictionary = None
+        pos_dictionary = None
         if args.data:
             paths = utils.split_paths(args.data)
             assert len(paths) > 0
@@ -157,7 +162,10 @@ class LanguageModelingTask(LegacyFairseqTask):
                 output_dictionary = TruncatedDictionary(
                     dictionary, args.output_dictionary_size
                 )
-        return (dictionary, output_dictionary)
+            if args.add_pos:
+                pos_dictionary = Dictionary.load(os.path.join(paths[0], "pos-dict.txt"))
+                logger.info("pos dictionary: {} types".format(len(pos_dictionary)))
+        return (dictionary, output_dictionary, pos_dictionary)
 
     @classmethod
     def setup_task(cls, args, **kwargs):
@@ -166,7 +174,7 @@ class LanguageModelingTask(LegacyFairseqTask):
         Args:
             args (argparse.Namespace): parsed command-line arguments
         """
-        dictionary, output_dictionary = cls.setup_dictionary(args, **kwargs)
+        dictionary, output_dictionary, pos_dictionary = cls.setup_dictionary(args, **kwargs)
 
         # upgrade old checkpoints
         if getattr(args, "exclude_self_target", False):
@@ -183,7 +191,7 @@ class LanguageModelingTask(LegacyFairseqTask):
             # standard language modeling
             targets = ["future"]
 
-        return cls(args, dictionary, output_dictionary, targets=targets)
+        return cls(args, dictionary, output_dictionary, targets=targets, pos_dictionary=pos_dictionary)
 
     def build_model(self, args):
         model = super().build_model(args)
@@ -249,7 +257,7 @@ class LanguageModelingTask(LegacyFairseqTask):
         if self.args.pad_to_fixed_bsz:
             pad_to_bsz = self.args.batch_size_valid if 'valid' in split else self.args.batch_size
 
-        self.datasets[split] = MonolingualDataset(
+        dataset = MonolingualDataset(
             dataset=dataset,
             sizes=dataset.sizes,
             src_vocab=self.dictionary,
@@ -261,6 +269,85 @@ class LanguageModelingTask(LegacyFairseqTask):
             fixed_pad_length=fixed_pad_length,
             pad_to_bsz=pad_to_bsz,
         )
+        if self.args.add_pos:
+            pos_dataset = self.load_pos_dataset(split, epoch, combine, **kwargs)
+            self.datasets[split] = NestedDictionaryDataset(
+                {
+                'pos': pos_dataset,
+                'token': dataset,
+                },
+                sizes=dataset.sizes
+            )
+        else:
+            self.datasets[split] = dataset
+    
+    def load_pos_dataset(
+        self, split: str, epoch=1, combine=False, **kwargs
+    ) -> MonolingualDataset:
+        """Load a given pos tag dataset split.
+
+        Args:
+            split (str): name of the split (e.g., train, valid, valid1, test)
+        """
+        paths = utils.split_paths(self.args.data)
+        assert len(paths) > 0
+
+        data_path = paths[(epoch - 1) % len(paths)]
+        split_path = os.path.join(data_path, "pos-{}".format(split))
+
+        # each process has its own copy of the raw data (likely to be an np.memmap)
+        dataset = data_utils.load_indexed_dataset(
+            split_path, self.dictionary, self.args.dataset_impl, combine=combine
+        )
+        if dataset is None:
+            raise FileNotFoundError(f"Dataset not found: {split} ({split_path})")
+
+        dataset = maybe_shorten_dataset(
+            dataset,
+            split,
+            self.args.shorten_data_split_list,
+            self.args.shorten_method,
+            self.args.tokens_per_sample,
+            self.args.seed,
+        )
+        dataset = TokenBlockDataset(
+            dataset,
+            dataset.sizes,
+            self.args.tokens_per_sample,
+            pad=self.dictionary.pad(),
+            eos=self.dictionary.eos(),
+            break_mode=self.args.sample_break_mode,
+            include_targets=True,
+            use_plasma_view=self.args.use_plasma_view,
+            split_path=split_path,
+            plasma_path=self.args.plasma_path,
+        )
+
+        add_eos_for_other_targets = (
+            self.args.sample_break_mode is not None
+            and self.args.sample_break_mode != "none"
+        )
+        fixed_pad_length = None
+        if self.args.pad_to_fixed_length:
+            fixed_pad_length = self.args.tokens_per_sample
+
+        pad_to_bsz = None
+        if self.args.pad_to_fixed_bsz:
+            pad_to_bsz = self.args.batch_size_valid if 'valid' in split else self.args.batch_size
+
+        dataset = MonolingualDataset(
+            dataset=dataset,
+            sizes=dataset.sizes,
+            src_vocab=self.dictionary,
+            tgt_vocab=self.output_dictionary,
+            add_eos_for_other_targets=add_eos_for_other_targets,
+            shuffle=True,
+            targets=self.targets,
+            add_bos_token=self.args.add_bos_token,
+            fixed_pad_length=fixed_pad_length,
+            pad_to_bsz=pad_to_bsz,
+        )
+        return dataset
 
     def build_dataset_for_inference(self, src_tokens, src_lengths, **kwargs):
         """

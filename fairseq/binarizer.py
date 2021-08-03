@@ -104,7 +104,7 @@ class Binarizer:
     @staticmethod
     def find_offsets(filename, num_chunks) -> List[int]:
         with open(PathManager.get_local_path(filename), "r", encoding="utf-8") as f:
-            size = os.fstat(f.fileno()).st_size
+            size = os.fstat(f.fileno()).st_size  # file size
             chunk_size = size // num_chunks
             offsets = [0 for _ in range(num_chunks + 1)]
             for i in range(1, num_chunks):

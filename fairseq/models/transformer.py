@@ -805,6 +805,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         alignment_heads: Optional[int] = None,
         src_lengths: Optional[Any] = None,
         return_all_hiddens: bool = False,
+        pos = None
     ):
         """
         Args:
@@ -818,6 +819,8 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 applying output layer (default: False).
             full_context_alignment (bool, optional): don't apply
                 auto-regressive mask to self-attention (default: False).
+            pos (LongTensor, optional): part-of-speech tag of shape `(batch, src_len)`
+                for knowledge moe
 
         Returns:
             tuple:
@@ -832,6 +835,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             full_context_alignment=full_context_alignment,
             alignment_layer=alignment_layer,
             alignment_heads=alignment_heads,
+            pos=pos,
         )
 
         if not features_only:
@@ -846,6 +850,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         full_context_alignment: bool = False,
         alignment_layer: Optional[int] = None,
         alignment_heads: Optional[int] = None,
+        pos = None,
     ):
         return self.extract_features_scriptable(
             prev_output_tokens,
@@ -854,6 +859,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             full_context_alignment,
             alignment_layer,
             alignment_heads,
+            pos,
         )
 
     """
@@ -870,6 +876,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         full_context_alignment: bool = False,
         alignment_layer: Optional[int] = None,
         alignment_heads: Optional[int] = None,
+        pos: [Optional[Tensor]] = None,
     ):
         """
         Similar to *forward* but only return features.

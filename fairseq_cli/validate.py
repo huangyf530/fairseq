@@ -15,6 +15,7 @@ from fairseq import checkpoint_utils, distributed_utils, options, utils
 from fairseq.dataclass.utils import convert_namespace_to_omegaconf
 from fairseq.logging import metrics, progress_bar
 from omegaconf import DictConfig
+from fairseq.data.encoders.gpt2_bpe import get_encoder
 
 
 logging.basicConfig(
@@ -116,17 +117,22 @@ def main(cfg: DictConfig, override_args=None):
         _dummy_batch = batch_itr.first_batch
 
         log_outputs = []
+        encoder = get_encoder("gpt2_bpe/encoder.json", "gpt2_bpe/vocab.bpe")
         for i, sample in enumerate(progress):
             if len(sample) == 0:
                 sample = _dummy_batch
+            for t in [1, 2]:
+                tokens = task.dictionary.string(sample['net_input']['src_tokens'][t]).split(' ')
+                length = sample['net_input']['src_lengths'][t].item()
+                # print(tokens[:length])
+                print(encoder.decode(map(int, tokens[:length])))
+            quit()
             sample = utils.move_to_cuda(sample) if use_cuda else sample
             _loss, _sample_size, log_output = task.valid_step(sample, model, criterion)
             progress.log(log_output, step=i)
             log_outputs.append(log_output)
 
         if data_parallel_world_size > 1:
-            print(data_parallel_rank, len(log_outputs))
-            torch.distributed.barrier()
             logger.info("gather log output among different workers.")
             log_outputs = distributed_utils.all_gather_list(
                 log_outputs,
@@ -144,14 +150,15 @@ def main(cfg: DictConfig, override_args=None):
     if saved_cfg.model.base_layers >= 0:
         if distributed_utils.is_master(cfg.distributed_training):
             cnt = 0
+            # print(model.decoder.layers)
             for layer in model.decoder.layers:
-                if hasattr(layer, "expert"):
+                if hasattr(layer, "expert_network"):
                     cnt += 1
                     each_expert_count = layer.each_expert_count.tolist()
-                    total = sum(each_token_num)
-                    print("Base layer {}:".format(cnt))
+                    total = sum(each_expert_count)
+                    logger.info("Base layer {}:".format(cnt))
                     for i, count in enumerate(each_expert_count):
-                        print("\texpert {}: {}".format(i, count / total))
+                        logger.info("\texpert {}: {}".format(i, count / total))
 
 def cli_main():
     parser = options.get_validation_parser()
