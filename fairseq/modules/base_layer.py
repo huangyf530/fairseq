@@ -59,6 +59,9 @@ class BaseLayer(nn.Module):
     def forward(self, input_features, *args, **kwargs):
         features = input_features.reshape(-1, input_features.size(-1))
         is_training = input_features.requires_grad
+        pos = kwargs.get('pos', None)
+        print(pos)
+        quit()
 
         if self.shuffle and is_training:
             # get input and output splits (when sentence length is not always same)
