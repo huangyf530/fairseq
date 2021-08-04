@@ -43,6 +43,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("test-pos")
 
+encoder = get_encoder("gpt2_bpe/encoder.json", "gpt2_bpe/vocab.bpe")
+
+def show_sent_pos(src_tokens, poses, task):
+    tokens = task.dictionary.string(src_tokens).split(' ')
+    print(encoder.decode(map(int, tokens)))
+    print(task.pos_dictionary.string(poses))
+
 
 def main(cfg: DictConfig, override_args=None):
     if isinstance(cfg, Namespace):
@@ -54,6 +61,16 @@ def main(cfg: DictConfig, override_args=None):
         try:
             task.load_dataset(subset, combine=False, epoch=1, task_cfg=cfg.task)
             dataset = task.dataset(subset)
+            # show_sent_pos(dataset[0]['token']['source'], dataset[0]['pos']['source'], task)
+            # for index, t in enumerate(dataset[0]['token']['source']):
+            #     token = task.dictionary[t]
+            #     pos = task.pos_dictionary[dataset[0]['pos']['source'][index]]
+            #     if t < 4:
+            #         print(token, '|', pos)
+            #     else:
+            #         print(encoder.decode([int(token)]), '|', pos)
+            # quit()
+            # show_sent_pos(dataset[0]['tokens'][])
         except KeyError:
             raise Exception("Cannot find dataset: " + subset)
         
@@ -82,19 +99,16 @@ def main(cfg: DictConfig, override_args=None):
         _dummy_batch = batch_itr.first_batch
         
         log_outputs = []
-        encoder = get_encoder("gpt2_bpe/encoder.json", "gpt2_bpe/vocab.bpe")
         for i, sample in enumerate(progress):
             if len(sample) == 0:
                 sample = _dummy_batch
             for t in [1, 2]:
                 sample['token']['net_input']['pos'] = sample['pos']['net_input']['src_tokens']
-                print(sample)
-                print(sample.keys())
-                quit()
-                tokens = task.dictionary.string(sample['net_input']['src_tokens'][t]).split(' ')
-                length = sample['net_input']['src_lengths'][t].item()
+                tokens = task.dictionary.string(sample['token']['net_input']['src_tokens'][t]).split(' ')
+                # length = sample['net_input']['src_lengths'][t].item()
                 # print(tokens[:length])
-                print(encoder.decode(map(int, tokens[:length])))
+                print(encoder.decode(map(int, tokens)))
+                print(task.pos_dictionary.string(sample['token']['net_input']['pos'][t]))
             quit()
     
 

@@ -25,6 +25,7 @@ from fairseq.data import (
     TokenBlockDataset,
     TruncatedDictionary,
     data_utils,
+    KnowledgeDataset,
 )
 from fairseq.data.indexed_dataset import get_available_dataset_impl
 from fairseq.data.shorten_dataset import maybe_shorten_dataset
@@ -92,6 +93,10 @@ class LanguageModelingConfig(FairseqDataclass):
     )
     add_pos: Optional[bool] = field(
         default=False, metadata={'help': "boolean to add pos tag"}
+    )
+    pos_expert_map: Optional[str] = field(
+        default="scripts-mine/pos-expert-map.json",
+        metadata={'help': "path to the map between pos tag and expert id."}
     )
 
     # TODO common vars below add to parent
@@ -314,8 +319,8 @@ class LanguageModelingTask(LegacyFairseqTask):
             dataset,
             dataset.sizes,
             self.args.tokens_per_sample,
-            pad=self.dictionary.pad(),
-            eos=self.dictionary.eos(),
+            pad=self.pos_dictionary.pad(),
+            eos=self.pos_dictionary.eos(),
             break_mode=self.args.sample_break_mode,
             include_targets=True,
             use_plasma_view=self.args.use_plasma_view,
@@ -335,11 +340,12 @@ class LanguageModelingTask(LegacyFairseqTask):
         if self.args.pad_to_fixed_bsz:
             pad_to_bsz = self.args.batch_size_valid if 'valid' in split else self.args.batch_size
 
-        dataset = MonolingualDataset(
+        dataset = KnowledgeDataset(
             dataset=dataset,
             sizes=dataset.sizes,
-            src_vocab=self.dictionary,
-            tgt_vocab=self.output_dictionary,
+            src_vocab=self.pos_dictionary,
+            pos_expert_map=self.args.pos_expert_map,
+            tgt_vocab=self.pos_dictionary,
             add_eos_for_other_targets=add_eos_for_other_targets,
             shuffle=True,
             targets=self.targets,

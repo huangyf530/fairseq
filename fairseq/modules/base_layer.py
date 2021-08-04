@@ -23,14 +23,17 @@ def soft_split(size, num_to_split):
         splits.append(min_size)
     return splits
 
-def pend_for_assign(features, num_expert):
+def pend_for_assign(features, num_expert, to_pend=None):
     """
     balanced assignment require the tokens can be divided by experts
     """
     size = features.shape[0]
     if size % num_expert != 0:
         left = num_expert - (size % num_expert)
-        to_append = torch.rand((left,) + features.shape[1:], dtype=features.dtype, device=features.device)
+        if to_pend is None:
+            to_append = torch.rand((left,) + features.shape[1:], dtype=features.dtype, device=features.device)
+        else:
+            to_append = torch.ones((left,) + features.shape[1:], dtype=features.dtype, device=features.device) * to_pend
         features = torch.cat([features, to_append])
     return features, size
 
@@ -55,10 +58,14 @@ class BaseLayer(nn.Module):
         # Add a special attribute to the expert parameters, so we know not to sync their gradients
         for param in self.expert_network.parameters():
             param.expert = True
+        self.expert_knowledge_loss = nn.KLDivLoss(reduction='batchmean')
 
     def forward(self, input_features, *args, **kwargs):
         features = input_features.reshape(-1, input_features.size(-1))
         is_training = input_features.requires_grad
+        pos = kwargs.get('pos', None)
+        if pos is not None:
+            pos = pos.reshape(-1, 1)
 
         if self.shuffle and is_training:
             # get input and output splits (when sentence length is not always same)
@@ -71,6 +78,8 @@ class BaseLayer(nn.Module):
             # Send each token to a random worker, to break correlations within the batch
             shuffle_sort = torch.randperm(features.size(0), device=features.device)
             features = All2All.apply(features[shuffle_sort], input_splits_list, output_splits_list)
+            if pos is not None:
+                pos = All2All.apply(features[shuffle_sort], input_splits_list, output_splits_list)
             # if input_splits_list[0] != input_splits_list[-1]:
             #     print(self.expert_id, "after shuffle", features.shape)
         if is_training:
@@ -78,10 +87,19 @@ class BaseLayer(nn.Module):
             features, init_size = pend_for_assign(features, self.num_workers)
             # if input_splits_list[0] != input_splits_list[-1]:
             #     print(self.expert_id, "after pend", features.shape)
+            if pos is not None:
+                # pend tensor size to expert 0(should be used definied, need update)
+                pos, pos_init_size = pend_for_assign(pos, self.num_workers, to_pend=0)
 
         with torch.no_grad():
             # Compute similarity of each token to each expert, for routing
             token_expert_affinities = features.matmul(self.expert_centroids.transpose(0, 1))
+        if pos is not None:
+            token_expert_affinities_prob = nn.Softmax(dim=-1)(token_expert_affinities)
+            pos = nn.functional.one_hot(pos, num_classes=self.num_workers)
+            # add label smoothing
+            pos = pos + (1 - 2 * pos) * 1e-4
+            knowledge_loss = self.expert_knowledge_loss(token_expert_affinities_prob.log(), pos)
 
         # Compute which token goes to which expert
         sort_by_expert, input_splits, output_splits = self.balanced_assignment(token_expert_affinities) \

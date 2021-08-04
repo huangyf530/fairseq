@@ -301,7 +301,7 @@ def train(
         if cfg.task.add_pos:
             new_samples = []
             for sample in samples:
-                sample['token']['net_input']['pos'] = sample['pos']['net_input']['src_tokens']
+                sample['token']['net_input']['pos'] = sample['pos']['net_input']['expert']
                 new_samples.append(sample['token'])
             samples = new_samples
         with metrics.aggregate("train_inner"), torch.autograd.profiler.record_function(
