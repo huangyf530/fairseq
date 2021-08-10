@@ -42,6 +42,11 @@ def progress_bar(
         log_format = default_log_format
     if log_file is not None:
         handler = logging.FileHandler(filename=log_file)
+        formatter = logging.Formatter(
+            fmt="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        handler.setFormatter(formatter)
         logger.addHandler(handler)
 
     if log_format == "tqdm" and not sys.stderr.isatty():

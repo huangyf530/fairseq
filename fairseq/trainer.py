@@ -39,7 +39,7 @@ class Trainer(object):
     communication of the gradients across workers.
     """
 
-    def __init__(self, cfg: FairseqConfig, task, model, criterion, quantizer=None):
+    def __init__(self, cfg: FairseqConfig, task, model, criterion, quantizer=None, layers=[]):
 
         if isinstance(cfg, Namespace):
             logger.warning(
@@ -150,6 +150,12 @@ class Trainer(object):
         self._start_time = time.time()
         self._previous_training_time = 0
         self._cumulative_training_time = None
+        self._knowledge_layer = []
+        if cfg.task.add_pos:
+            for l in layers:
+                if hasattr(l, 'knowledge_loss'):
+                    self._knowledge_layer.append(l)
+                    # print("inlayers", l.expert_network[0].ff1.weight)
 
     def reinitialize(self):
         """Reinitialize the Trainer, typically after model params change."""
@@ -299,6 +305,10 @@ class Trainer(object):
                     self.cfg, params
                 )
             else:
+                # for n, p in self.model.decoder.layers[6].named_parameters():
+                #     if self.cfg.distributed_training.distributed_rank == 0:
+                #         print(n, p)
+                # quit()
                 self._optimizer = optim.FP16Optimizer.build_optimizer(self.cfg, params)
         else:
             if self.cuda and torch.cuda.get_device_capability(0)[0] >= 7:
@@ -700,6 +710,7 @@ class Trainer(object):
                         optimizer=self.optimizer,
                         update_num=self.get_num_updates(),
                         ignore_grad=is_dummy_batch,
+                        knowledge_layer=self._knowledge_layer
                     )
                     del loss
 

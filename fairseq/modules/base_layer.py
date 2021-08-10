@@ -9,6 +9,7 @@ import sys
 from fairseq import utils
 from fairseq.distributed import utils as distributed_utils
 from fairseq.modules.layer_norm import LayerNorm
+import fairseq.utils as utils
 
 def soft_split(size, num_to_split):
     """
@@ -58,7 +59,8 @@ class BaseLayer(nn.Module):
         # Add a special attribute to the expert parameters, so we know not to sync their gradients
         for param in self.expert_network.parameters():
             param.expert = True
-        self.expert_knowledge_loss = nn.KLDivLoss(reduction='batchmean')
+        self.expert_knowledge_loss = nn.KLDivLoss(reduction='sum')
+        self.knowledge_loss = None
 
     def forward(self, input_features, *args, **kwargs):
         features = input_features.reshape(-1, input_features.size(-1))
@@ -91,19 +93,21 @@ class BaseLayer(nn.Module):
                 # pend tensor size to expert 0(should be used definied, need update)
                 pos, pos_init_size = pend_for_assign(pos, self.num_workers, to_pend=0)
 
-        with torch.no_grad():
-            # Compute similarity of each token to each expert, for routing
-            token_expert_affinities = features.matmul(self.expert_centroids.transpose(0, 1))
+        # with torch.no_grad():
+        # Compute similarity of each token to each expert, for routing
+        token_expert_affinities = features.matmul(self.expert_centroids.transpose(0, 1))
         if pos is not None:
-            token_expert_affinities_prob = nn.Softmax(dim=-1)(token_expert_affinities)
+            token_expert_affinities_prob = utils.softmax(x=token_expert_affinities, dim=-1)
             pos = nn.functional.one_hot(pos, num_classes=self.num_workers)
             # add label smoothing
             pos = pos + (1 - 2 * pos) * 1e-4
-            knowledge_loss = self.expert_knowledge_loss(token_expert_affinities_prob.log(), pos)
+            pos = torch.squeeze(pos, 1)
+            self.knowledge_loss = self.expert_knowledge_loss(token_expert_affinities_prob.log(), pos)
 
-        # Compute which token goes to which expert
-        sort_by_expert, input_splits, output_splits = self.balanced_assignment(token_expert_affinities) \
-            if is_training else self.greedy_assignment(token_expert_affinities)
+        with torch.no_grad():
+            # Compute which token goes to which expert, no need to have grad
+            sort_by_expert, input_splits, output_splits = self.balanced_assignment(token_expert_affinities) \
+                if is_training else self.greedy_assignment(token_expert_affinities)
 
         # Swap these tokens for the right ones for our expert
         routed_features = All2All.apply(features[sort_by_expert], output_splits, input_splits)

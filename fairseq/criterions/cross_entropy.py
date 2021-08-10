@@ -4,7 +4,8 @@
 # LICENSE file in the root directory of this source tree.
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional
 
 import torch.nn.functional as F
 from fairseq import metrics, utils
@@ -16,15 +17,20 @@ from omegaconf import II
 @dataclass
 class CrossEntropyCriterionConfig(FairseqDataclass):
     sentence_avg: bool = II("optimization.sentence_avg")
+    knowledge_alpha: Optional[float] = field(
+        default=1e-4,
+        metadata={'help': "parameter for knowledge KL loss."}
+    )
 
 
 @register_criterion("cross_entropy", dataclass=CrossEntropyCriterionConfig)
 class CrossEntropyCriterion(FairseqCriterion):
-    def __init__(self, task, sentence_avg):
+    def __init__(self, task, sentence_avg, knowledge_alpha):
         super().__init__(task)
         self.sentence_avg = sentence_avg
+        self.knowledge_alpha = knowledge_alpha
 
-    def forward(self, model, sample, reduce=True):
+    def forward(self, model, sample, reduce=True, **kwargs):
         """Compute the loss for the given sample.
 
         Returns a tuple with three elements:
@@ -32,8 +38,16 @@ class CrossEntropyCriterion(FairseqCriterion):
         2) the sample size, which is used as the denominator for the gradient
         3) logging outputs to display while training
         """
+        knowledge_layer = kwargs.get("knowledge_layer", [])
         net_output = model(**sample["net_input"])
         loss, _ = self.compute_loss(model, net_output, sample, reduce=reduce)
+        knowledge_loss = 0
+        for l in knowledge_layer:
+            knowledge_loss += l.knowledge_loss
+        if not isinstance(knowledge_loss, int):
+            lm_loss = loss
+            loss = (1 - self.knowledge_alpha) * loss + self.knowledge_alpha * knowledge_loss
+        # print("l2", loss, loss.dtype)
         sample_size = (
             sample["target"].size(0) if self.sentence_avg else sample["ntokens"]
         )
@@ -43,6 +57,9 @@ class CrossEntropyCriterion(FairseqCriterion):
             "nsentences": sample["target"].size(0),
             "sample_size": sample_size,
         }
+        if not isinstance(knowledge_loss, int):
+            logging_output['lm_loss'] = lm_loss.data
+            logging_output['kl_loss'] = knowledge_loss
         return loss, sample_size, logging_output
 
     def compute_loss(self, model, net_output, sample, reduce=True):
@@ -63,10 +80,19 @@ class CrossEntropyCriterion(FairseqCriterion):
         loss_sum = sum(log.get("loss", 0) for log in logging_outputs)
         ntokens = sum(log.get("ntokens", 0) for log in logging_outputs)
         sample_size = sum(log.get("sample_size", 0) for log in logging_outputs)
+        lm_loss_sum = sum(log.get("lm_loss", 0) for log in logging_outputs)
+        kl_loss_sum = sum(log.get("kl_loss", 0) for log in logging_outputs)
 
         # we divide by log(2) to convert the loss from base e to base 2
         metrics.log_scalar(
             "loss", loss_sum / sample_size / math.log(2), sample_size, round=3
+        )
+        # log language model loss and kl divergence loss
+        metrics.log_scalar(
+            "lm_loss", lm_loss_sum / sample_size / math.log(2), sample_size, round=3
+        )
+        metrics.log_scalar(
+            "kl_loss", kl_loss_sum / sample_size / math.log(2), sample_size, round=3
         )
         if sample_size != ntokens:
             metrics.log_scalar(
