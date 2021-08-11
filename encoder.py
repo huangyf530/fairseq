@@ -90,8 +90,9 @@ def main():
         #     if line == '':
         #         continue
         #     states, enc_lines, pos_tags, corresponding_words = encoder.encode_lines([line])
-        #     # for index, token in enumerate(enc_lines[0].split(' ')):
-        #     #     print(encoder.decode([int(token)]), '|', pos_tags[0][index])
+        #     for index, token in enumerate(enc_lines[0].split(' ')):
+        #         print(encoder.decode([int(token)]), '|', pos_tags[0].split(' ')[index], '|', corresponding_words[0][index])
+        #     print()
         # quit()
         pool = Pool(args.workers, initializer=encoder.initializer)
         encoded_lines = pool.imap(encoder.encode_lines, zip(*inputs), 2)
@@ -159,17 +160,24 @@ class MultiprocessingEncoder(object):
         tokenizerd_sent = nltk.word_tokenize(line)
         current_token = ''
         cnt = 0
+        if cnt < len(tokenizerd_sent):
+            is_double_yinhao = (tokenizerd_sent[cnt] == '``' or tokenizerd_sent[cnt] == "''")
         positions = [0]
         for pos, t in enumerate(line):
             current_token += t
-            if tokenizerd_sent[cnt] in current_token or '"' in current_token or "''" in current_token:
+            if tokenizerd_sent[cnt] in current_token or \
+              ('"' in current_token and is_double_yinhao) or \
+              ("''" in current_token and is_double_yinhao):
                 cnt += 1
                 positions.append(pos + 1)
                 current_token = ''
+                if cnt < len(tokenizerd_sent):
+                    is_double_yinhao = (tokenizerd_sent[cnt] == '``' or tokenizerd_sent[cnt] == "''")
         try:
             assert len(positions) == len(tokenizerd_sent) + 1,\
             f"positions length {len(positions)} doesn't match tokenized sentence {len(tokenizerd_sent)}"
         except AssertionError as e:
+            print("Assertion Error")
             print(line)
             print(tokenizerd_sent)
             print(positions)
@@ -183,13 +191,13 @@ class MultiprocessingEncoder(object):
         recover_line = ''
         for index, token in enumerate(enc_tokens):
             recover_line = self.decode(map(int, enc_tokens[:index + 1]))
-            if cnt < (len(positions) - 1) and len(recover_line) > positions[cnt + 1]:
-                # print("cnt--", cnt)
-                # print(t, cnt < (len(positions) - 1), len(recover_line) > positions[cnt + 1])
-                cnt += 1
+            if cnt < (len(positions) - 1):
+                while(len(recover_line) > positions[cnt + 1]):
+                    cnt += 1
             try:
                 pos_tag.append(poses[cnt][1])
             except IndexError as e:
+                print("Index Error")
                 print("cnt", cnt)
                 print(poses)
                 print(positions)
