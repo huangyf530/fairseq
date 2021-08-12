@@ -305,10 +305,6 @@ class Trainer(object):
                     self.cfg, params
                 )
             else:
-                # for n, p in self.model.decoder.layers[6].named_parameters():
-                #     if self.cfg.distributed_training.distributed_rank == 0:
-                #         print(n, p)
-                # quit()
                 self._optimizer = optim.FP16Optimizer.build_optimizer(self.cfg, params)
         else:
             if self.cuda and torch.cuda.get_device_capability(0)[0] >= 7:
@@ -951,7 +947,7 @@ class Trainer(object):
 
             try:
                 _loss, sample_size, logging_output = self.task.valid_step(
-                    sample, self.model, self.criterion
+                    sample, self.model, self.criterion, knowledge_layer=self._knowledge_layer
                 )
             except RuntimeError as e:
                 if "out of memory" in str(e):

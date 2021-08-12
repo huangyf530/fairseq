@@ -59,13 +59,14 @@ class BaseLayer(nn.Module):
         # Add a special attribute to the expert parameters, so we know not to sync their gradients
         for param in self.expert_network.parameters():
             param.expert = True
-        self.expert_knowledge_loss = nn.KLDivLoss(reduction='sum')
+        self.expert_knowledge_loss = nn.KLDivLoss(reduction='none')
         self.knowledge_loss = None
 
     def forward(self, input_features, *args, **kwargs):
         features = input_features.reshape(-1, input_features.size(-1))
         is_training = input_features.requires_grad
         pos = kwargs.get('pos', None)
+        pos_init_size = None
         if pos is not None:
             pos = pos.reshape(-1, 1)
 
@@ -81,14 +82,10 @@ class BaseLayer(nn.Module):
             shuffle_sort = torch.randperm(features.size(0), device=features.device)
             features = All2All.apply(features[shuffle_sort], input_splits_list, output_splits_list)
             if pos is not None:
-                pos = All2All.apply(features[shuffle_sort], input_splits_list, output_splits_list)
-            # if input_splits_list[0] != input_splits_list[-1]:
-            #     print(self.expert_id, "after shuffle", features.shape)
+                pos = All2All.apply(pos[shuffle_sort], input_splits_list, output_splits_list)
         if is_training:
             # pend for balanced assignment
             features, init_size = pend_for_assign(features, self.num_workers)
-            # if input_splits_list[0] != input_splits_list[-1]:
-            #     print(self.expert_id, "after pend", features.shape)
             if pos is not None:
                 # pend tensor size to expert 0(should be used definied, need update)
                 pos, pos_init_size = pend_for_assign(pos, self.num_workers, to_pend=0)
@@ -102,7 +99,7 @@ class BaseLayer(nn.Module):
             # add label smoothing
             pos = pos + (1 - 2 * pos) * 1e-4
             pos = torch.squeeze(pos, 1)
-            self.knowledge_loss = self.expert_knowledge_loss(token_expert_affinities_prob.log(), pos)
+            self.knowledge_loss = self.expert_knowledge_loss(token_expert_affinities_prob.log(), pos)[:pos_init_size ,...]
 
         with torch.no_grad():
             # Compute which token goes to which expert, no need to have grad
@@ -131,6 +128,8 @@ class BaseLayer(nn.Module):
         if self.shuffle and is_training:
             # Undo shuffling
             result = All2All.apply(result, output_splits_list, input_splits_list)[self.inverse_sort(shuffle_sort)]
+            if pos is not None:
+                self.knowledge_loss = All2All.apply(self.knowledge_loss, output_splits_list, input_splits_list)[self.inverse_sort(shuffle_sort)]
         if self.isdecoder:
             # Return additional Nones for compatibility with TransformerDecoderLayer
             return result.view(input_features.size()), None, None

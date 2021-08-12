@@ -135,7 +135,13 @@ def main(cfg: FairseqConfig) -> None:
 
     # Build trainer
     if cfg.common.model_parallel_size == 1:
-        trainer = Trainer(cfg, task, model, criterion, quantizer, model.decoder.layers)
+        layers = None
+        if 'roberta' in cfg.model._name:
+            trainer = Trainer(cfg, task, model, criterion, quantizer, model.encoder.sentence_encoder.layers)
+        elif 'transformer_lm' in cfg.model._name:
+            trainer = Trainer(cfg, task, model, criterion, quantizer, model.decoder.layers)
+        else:
+            trainer = Trainer(cfg, task, model, criterion, quantizer)
     else:
         trainer = MegatronTrainer(cfg, task, model, criterion)
     logger.info(

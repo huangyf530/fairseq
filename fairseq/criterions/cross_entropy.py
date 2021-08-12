@@ -43,10 +43,12 @@ class CrossEntropyCriterion(FairseqCriterion):
         loss, _ = self.compute_loss(model, net_output, sample, reduce=reduce)
         knowledge_loss = 0
         for l in knowledge_layer:
-            knowledge_loss += l.knowledge_loss
+            if reduce:
+                knowledge_loss += l.knowledge_loss.sum()
+            else:
+                knowledge_loss += l.knowledge_loss
         if not isinstance(knowledge_loss, int):
-            lm_loss = loss
-            loss = (1 - self.knowledge_alpha) * loss + self.knowledge_alpha * knowledge_loss
+            syn_loss = (1 - self.knowledge_alpha) * loss + self.knowledge_alpha * knowledge_loss
         # print("l2", loss, loss.dtype)
         sample_size = (
             sample["target"].size(0) if self.sentence_avg else sample["ntokens"]
@@ -58,8 +60,9 @@ class CrossEntropyCriterion(FairseqCriterion):
             "sample_size": sample_size,
         }
         if not isinstance(knowledge_loss, int):
-            logging_output['lm_loss'] = lm_loss.data
-            logging_output['kl_loss'] = knowledge_loss
+            logging_output['syn_loss'] = syn_loss.data
+            logging_output['kl_loss'] = knowledge_loss.data
+            return syn_loss, sample_size, logging_output
         return loss, sample_size, logging_output
 
     def compute_loss(self, model, net_output, sample, reduce=True):
@@ -80,7 +83,7 @@ class CrossEntropyCriterion(FairseqCriterion):
         loss_sum = sum(log.get("loss", 0) for log in logging_outputs)
         ntokens = sum(log.get("ntokens", 0) for log in logging_outputs)
         sample_size = sum(log.get("sample_size", 0) for log in logging_outputs)
-        lm_loss_sum = sum(log.get("lm_loss", 0) for log in logging_outputs)
+        syn_loss_sum = sum(log.get("syn_loss", 0) for log in logging_outputs)
         kl_loss_sum = sum(log.get("kl_loss", 0) for log in logging_outputs)
 
         # we divide by log(2) to convert the loss from base e to base 2
@@ -88,12 +91,13 @@ class CrossEntropyCriterion(FairseqCriterion):
             "loss", loss_sum / sample_size / math.log(2), sample_size, round=3
         )
         # log language model loss and kl divergence loss
-        metrics.log_scalar(
-            "lm_loss", lm_loss_sum / sample_size / math.log(2), sample_size, round=3
-        )
-        metrics.log_scalar(
-            "kl_loss", kl_loss_sum / sample_size / math.log(2), sample_size, round=3
-        )
+        if syn_loss_sum > 0:
+            metrics.log_scalar(
+                "syn_loss", syn_loss_sum / sample_size / math.log(2), sample_size, round=3
+            )
+            metrics.log_scalar(
+                "kl_loss", kl_loss_sum / sample_size / math.log(2), sample_size, round=3
+            )
         if sample_size != ntokens:
             metrics.log_scalar(
                 "nll_loss", loss_sum / ntokens / math.log(2), ntokens, round=3

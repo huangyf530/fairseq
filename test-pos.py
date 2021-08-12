@@ -45,8 +45,21 @@ logger = logging.getLogger("test-pos")
 
 encoder = get_encoder("gpt2_bpe/encoder.json", "gpt2_bpe/vocab.bpe")
 
-def show_sent_pos(src_tokens, poses, task):
+def show_sent_pos(src_tokens, poses, task, target=None):
     tokens = task.dictionary.string(src_tokens).split(' ')
+    if target is not None:
+        targets = task.dictionary.string(target).split(' ')
+        print(len(tokens))
+        print(len(targets))
+        ids = []
+        for index, t in enumerate(tokens):
+            try:
+                ids.append(int(t))
+            except ValueError as e:
+                print(t)
+                print(targets[index])
+                ids.append(int(targets[index]))
+        tokens = ids
     print(encoder.decode(map(int, tokens)))
     print(task.pos_dictionary.string(poses))
 
@@ -61,15 +74,17 @@ def main(cfg: DictConfig, override_args=None):
         try:
             task.load_dataset(subset, combine=False, epoch=1, task_cfg=cfg.task)
             dataset = task.dataset(subset)
-            # show_sent_pos(dataset[0]['token']['source'], dataset[0]['pos']['source'], task)
-            # for index, t in enumerate(dataset[0]['token']['source']):
-            #     token = task.dictionary[t]
-            #     pos = task.pos_dictionary[dataset[0]['pos']['source'][index]]
-            #     if t < 4:
-            #         print(token, '|', pos)
-            #     else:
-            #         print(encoder.decode([int(token)]), '|', pos)
-            # quit()
+            print(dataset[0].keys())
+            # show_sent_pos(dataset[0]['token.net_input.src_tokens'], dataset[0]['pos']['source'], task, target=dataset[0]['token.target'])
+            for index, t in enumerate(dataset[100]['token.net_input.src_tokens']):
+                token = task.dictionary[t]
+                pos = task.pos_dictionary[dataset[100]['pos']['source'][index]]
+                target = task.dictionary[dataset[100]['token.target'][index]]
+                try:
+                    print(encoder.decode([int(token)]), '|', pos, '|', target)
+                except ValueError as e:
+                    print(token, '|', pos, '|', target)
+            quit()
             # show_sent_pos(dataset[0]['tokens'][])
         except KeyError:
             raise Exception("Cannot find dataset: " + subset)

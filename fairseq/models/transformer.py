@@ -451,6 +451,7 @@ class TransformerEncoder(FairseqEncoder):
         src_lengths: Optional[torch.Tensor] = None,
         return_all_hiddens: bool = False,
         token_embeddings: Optional[torch.Tensor] = None,
+        pos: Optional[torch.Tensor] = None,
     ):
         """
         Args:
@@ -462,6 +463,7 @@ class TransformerEncoder(FairseqEncoder):
                 intermediate hidden states (default: False).
             token_embeddings (torch.Tensor, optional): precomputed embeddings
                 default `None` will recompute embeddings
+            pos (torch.Tensor, optional): pos tag for knowledge moe
 
         Returns:
             dict:
@@ -476,7 +478,7 @@ class TransformerEncoder(FairseqEncoder):
                   Only populated if *return_all_hiddens* is True.
         """
         return self.forward_scriptable(
-            src_tokens, src_lengths, return_all_hiddens, token_embeddings
+            src_tokens, src_lengths, return_all_hiddens, token_embeddings, pos
         )
 
     # TorchScript doesn't support super() method so that the scriptable Subclass
@@ -489,6 +491,7 @@ class TransformerEncoder(FairseqEncoder):
         src_lengths: Optional[torch.Tensor] = None,
         return_all_hiddens: bool = False,
         token_embeddings: Optional[torch.Tensor] = None,
+        pos: Optional[torch.Tensor] = None,
     ):
         """
         Args:
@@ -533,9 +536,14 @@ class TransformerEncoder(FairseqEncoder):
 
         # encoder layers
         for layer in self.layers:
-            x = layer(
-                x, encoder_padding_mask=encoder_padding_mask if has_pads else None
-            )
+            if hasattr(layer, 'expert_network'):
+                x = layer(
+                    x, encoder_padding_mask=encoder_padding_mask if has_pads else None, pos=pos
+                )
+            else:
+                x = layer(
+                    x, encoder_padding_mask=encoder_padding_mask if has_pads else None
+                )
             if return_all_hiddens:
                 assert encoder_states is not None
                 encoder_states.append(x)

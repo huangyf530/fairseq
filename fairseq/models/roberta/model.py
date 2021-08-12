@@ -483,6 +483,7 @@ class RobertaEncoder(FairseqEncoder):
         features_only=False,
         return_all_hiddens=False,
         masked_tokens=None,
+        pos=None,
         **unused,
     ):
         """
@@ -502,7 +503,7 @@ class RobertaEncoder(FairseqEncoder):
                   states have shape `(src_len, batch, vocab)`.
         """
         x, extra = self.extract_features(
-            src_tokens, return_all_hiddens=return_all_hiddens
+            src_tokens, return_all_hiddens=return_all_hiddens, pos=pos
         )
         if not features_only:
             x = self.output_layer(x, masked_tokens=masked_tokens)
@@ -513,6 +514,7 @@ class RobertaEncoder(FairseqEncoder):
             src_tokens,
             return_all_hiddens=return_all_hiddens,
             token_embeddings=kwargs.get("token_embeddings", None),
+            pos=kwargs.get('pos', None)
         )
         # T x B x C -> B x T x C
         features = encoder_out["encoder_out"][0].transpose(0, 1)

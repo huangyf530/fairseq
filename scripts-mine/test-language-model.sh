@@ -5,7 +5,7 @@ MAX_SENTENCES=16        # Number of sequences per batch (batch size)
 
 ROOT_DIR=/workspace
 cd $ROOT_DIR
-DATA_DIR=$ROOT_DIR/data-bin/wikitext-103
+DATA_DIR=$ROOT_DIR/data-bin/openwebtext
 MODEL_DIR=$ROOT_DIR/checkpoints/language-model
 MODEL_PATH=$MODEL_DIR/checkpoint_best.pt
 

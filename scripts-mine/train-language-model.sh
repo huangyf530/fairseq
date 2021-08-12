@@ -39,5 +39,5 @@ python train.py --fp16 --fp16-init-scale 8 $DATA_DIR \
     --log-format simple --log-interval 1 $LOG_ARGS \
     --save-dir $SAVE_DIR --save-interval-updates 1000 --keep-interval-updates 3  --keep-last-epochs 5 \
     --base-layers $BASE_LAYERS --base-sublayers 1 \
-    --validate-interval-updates 500 --skip-invalid-size-inputs-valid-test \
+    --validate-interval-updates 1 --skip-invalid-size-inputs-valid-test \
     $POS_ARGS

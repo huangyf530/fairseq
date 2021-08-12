@@ -9,17 +9,18 @@ UPDATE_FREQ=32          # Increase the batch size 32x
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
 # export NCCL_DEBUG=INFO
 
-DATA_DIR=data-bin/bert-corpus
-SAVE_DIR=checkpoints/roberta-1l-expert
+DATA_DIR=data-bin/wikitext-103
+SAVE_DIR=checkpoints/roberta-expert-pos
 TENSORBOARD_DIR=$SAVE_DIR/tensorboard
 LOG_FILE=$SAVE_DIR/train.log
 LOG_ARGS="--log-file $LOG_FILE --tensorboard-logdir $TENSORBOARD_DIR"
+POS_ARGS="--add-pos --pos-expert-map scripts-mine/pos-expert-map.json --knowledge-alpha 5e-2"
 
 echo "[Fairseq] Build c++ extensible..."
 # python setup.py build_ext --inplace
 mkdir -p $SAVE_DIR
 echo "[Fairseq] Begin Training ..."
-python fairseq_cli/train.py --fp16 --fp16-init-scale 8 $DATA_DIR \
+python train.py --fp16 --fp16-init-scale 8 $DATA_DIR \
     --task masked_lm --criterion masked_lm \
     --arch roberta_base --sample-break-mode complete --tokens-per-sample $TOKENS_PER_SAMPLE \
     --optimizer adam --adam-betas '(0.9,0.98)' --adam-eps 1e-6 --clip-norm 0.0 \
@@ -27,8 +28,9 @@ python fairseq_cli/train.py --fp16 --fp16-init-scale 8 $DATA_DIR \
     --dropout 0.1 --attention-dropout 0.1 --weight-decay 0.01 \
     --batch-size $MAX_SENTENCES --update-freq $UPDATE_FREQ \
     --max-update $TOTAL_UPDATES \
-    --log-format simple --log-interval 10 $LOG_ARGS \
+    --log-format simple --log-interval 1 $LOG_ARGS \
     --save-dir $SAVE_DIR --save-interval-updates 1000 --keep-interval-updates 3 \
     --base-layers 1 --base-sublayers 1 \
-    --validate-interval-updates 500 --skip-invalid-size-inputs-valid-test \
-    --ddp-backend legacy_ddp --fp16-no-flatten-grads
+    --validate-interval-updates 1 --skip-invalid-size-inputs-valid-test \
+    --ddp-backend legacy_ddp --fp16-no-flatten-grads \
+    $POS_ARGS
