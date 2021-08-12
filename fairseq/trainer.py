@@ -1125,6 +1125,10 @@ class Trainer(object):
             ), "Invalid dummy batch: {}".format(self._dummy_batch)
             sample, _ = self._prepare_sample(self._dummy_batch, is_dummy=True)
             return sample, True
+        
+        if 'pos' in sample:
+            sample['token']['net_input']['pos'] = sample['pos']['net_input']['expert']
+            sample = sample['token']
 
         if self.cuda:
             if self.pipeline_model_parallel:

@@ -91,6 +91,7 @@ class LanguageModelingConfig(FairseqDataclass):
     pad_to_fixed_bsz: Optional[bool] = field(
         default=False, metadata={"help": "boolean to pad to fixed batch size"},
     )
+    # knowledge in moe
     add_pos: Optional[bool] = field(
         default=False, metadata={'help': "boolean to add pos tag"}
     )

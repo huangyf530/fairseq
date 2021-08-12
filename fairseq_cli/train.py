@@ -298,12 +298,6 @@ def train(
         #     target = task.dictionary.string(target).split(' ')
         #     print(encoder.decode(map(int, target)))
         # torch.distributed.barrier()
-        if cfg.task.add_pos:
-            new_samples = []
-            for sample in samples:
-                sample['token']['net_input']['pos'] = sample['pos']['net_input']['expert']
-                new_samples.append(sample['token'])
-            samples = new_samples
         with metrics.aggregate("train_inner"), torch.autograd.profiler.record_function(
             "train_step-%d" % i
         ):
@@ -477,6 +471,10 @@ def validate(
             for i, sample in enumerate(progress):
                 if cfg.dataset.max_valid_steps is not None and i > cfg.dataset.max_valid_steps:
                     break
+                # print(sample.keys())
+                # if cfg.task.add_pos:
+                #     sample['token']['net_input']['pos'] = sample['pos']['net_input']['expert']
+                #     sample = sample['token']
                 trainer.valid_step(sample)
 
         # log validation stats
