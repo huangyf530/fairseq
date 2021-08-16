@@ -121,12 +121,15 @@ def main(cfg: DictConfig, override_args=None):
         for i, sample in enumerate(progress):
             if len(sample) == 0:
                 sample = _dummy_batch
-            for t in [1, 2]:
-                tokens = task.dictionary.string(sample['net_input']['src_tokens'][t]).split(' ')
-                length = sample['net_input']['src_lengths'][t].item()
-                # print(tokens[:length])
-                print(encoder.decode(map(int, tokens[:length])))
-            quit()
+            # for t in [1, 2]:
+            #     tokens = task.dictionary.string(sample['net_input']['src_tokens'][t]).split(' ')
+            #     length = sample['net_input']['src_lengths'][t].item()
+            #     # print(tokens[:length])
+            #     print(encoder.decode(map(int, tokens[:length])))
+            # quit()
+            if 'pos' in sample:
+                sample['token']['net_input']['pos'] = sample['pos']['net_input']['src_tokens']
+                sample = sample['token']
             sample = utils.move_to_cuda(sample) if use_cuda else sample
             _loss, _sample_size, log_output = task.valid_step(sample, model, criterion)
             progress.log(log_output, step=i)
@@ -159,6 +162,25 @@ def main(cfg: DictConfig, override_args=None):
                     logger.info("Base layer {}:".format(cnt))
                     for i, count in enumerate(each_expert_count):
                         logger.info("\texpert {}: {}".format(i, count / total))
+        if saved_cfg.task.add_pos:
+            cnt = 0
+            header = "\t        "
+            for i, pos_name in enumerate(task.pos_dictionary.indices):
+                header += f"\t{pos_name}"
+            for layer in model.decoder.layers:
+                if hasattr(layer, "expert_network"):
+                    cnt += 1
+                    pos_tensor_list = distributed_utils.all_gather(layer.pos_count, distributed_utils.get_data_parallel_group())
+                    logger.info("Base layer {}:".format(cnt))
+                    logger.info(header)
+                    for expert_id, t in enumerate(pos_tensor_list):
+                        pos_count_list = t.tolist()
+                        pos_sum = sum(pos_count_list)
+                        log_info = "\texpert {}".format(expert_id)
+                        for i, count in enumerate(pos_count_list):
+                            log_info += "\t{:.3f}".format(count / pos_sum)
+                        logger.info(log_info)
+
 
 def cli_main():
     parser = options.get_validation_parser()

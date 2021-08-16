@@ -61,6 +61,7 @@ class BaseLayer(nn.Module):
             param.expert = True
         self.expert_knowledge_loss = nn.KLDivLoss(reduction='none')
         self.knowledge_loss = None
+        self.pos_count = torch.zeros(16, dtype=torch.int64)  # need modify to be more flexible
 
     def forward(self, input_features, *args, **kwargs):
         features = input_features.reshape(-1, input_features.size(-1))
@@ -93,7 +94,7 @@ class BaseLayer(nn.Module):
         # with torch.no_grad():
         # Compute similarity of each token to each expert, for routing
         token_expert_affinities = features.matmul(self.expert_centroids.transpose(0, 1))
-        if pos is not None:
+        if pos is not None and is_training:
             token_expert_affinities_prob = utils.softmax(x=token_expert_affinities, dim=-1)
             pos = nn.functional.one_hot(pos, num_classes=self.num_workers)
             # add label smoothing
@@ -115,6 +116,11 @@ class BaseLayer(nn.Module):
             each_token_num[self.expert_id] = my_token_num
             torch.distributed.all_reduce(each_token_num, op=torch.distributed.ReduceOp.SUM)
             self.each_expert_count += each_token_num.to(self.each_expert_count.device)
+            # pos count in each expert
+            routed_pos = All2All.apply(pos[sort_by_expert], output_splits, input_splits)
+            pos_type, pos_count = torch.unique(routed_pos, return_counts=True)
+            self.pos_count = self.pos_count.to(routed_features.device)
+            self.pos_count[pos_type] += pos_count
 
         if routed_features.size(0) > 0:
             # Mix in the expert network based on how appropriate it is for these tokens
