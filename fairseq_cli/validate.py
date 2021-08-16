@@ -117,7 +117,7 @@ def main(cfg: DictConfig, override_args=None):
         _dummy_batch = batch_itr.first_batch
 
         log_outputs = []
-        encoder = get_encoder("gpt2_bpe/encoder.json", "gpt2_bpe/vocab.bpe")
+        # encoder = get_encoder("gpt2_bpe/encoder.json", "gpt2_bpe/vocab.bpe")
         for i, sample in enumerate(progress):
             if len(sample) == 0:
                 sample = _dummy_batch
