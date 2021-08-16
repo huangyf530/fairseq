@@ -72,6 +72,7 @@ def get_validation_parser(default_task=None):
     add_distributed_training_args(parser, default_world_size=1)
     group = parser.add_argument_group("Evaluation")
     gen_parser_from_dataclass(group, CommonEvalConfig())
+    parser.add_argument("--add-pos", action="store_true")
     return parser
 
 
