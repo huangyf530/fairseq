@@ -386,6 +386,9 @@ def load_model_ensemble_and_task(
                 cfg = convert_namespace_to_omegaconf(state["args"])
             elif "cfg" in state and state["cfg"] is not None:
                 cfg = state["cfg"]
+                if "add_pos" in arg_overrides:
+                    with open_dict(cfg):
+                        cfg['task']['add_pos'] = arg_overrides['add_pos']
             else:
                 raise RuntimeError(
                     f"Neither args nor cfg exist in state keys = {state.keys()}"

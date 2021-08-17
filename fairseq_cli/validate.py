@@ -159,14 +159,15 @@ def main(cfg: DictConfig, override_args=None):
                     cnt += 1
                     each_expert_count = layer.each_expert_count.tolist()
                     total = sum(each_expert_count)
+                    print(layer.each_expert_count)
                     logger.info("Base layer {}:".format(cnt))
                     for i, count in enumerate(each_expert_count):
                         logger.info("\texpert {}: {}".format(i, count / total))
         if saved_cfg.task.add_pos:
             cnt = 0
-            header = "\t        "
+            header = ""
             for i, pos_name in enumerate(task.pos_dictionary.indices):
-                header += f"\t{pos_name}"
+                header += f",{pos_name}"
             for layer in model.decoder.layers:
                 if hasattr(layer, "expert_network"):
                     cnt += 1
@@ -176,9 +177,11 @@ def main(cfg: DictConfig, override_args=None):
                     for expert_id, t in enumerate(pos_tensor_list):
                         pos_count_list = t.tolist()
                         pos_sum = sum(pos_count_list)
-                        log_info = "\texpert {}".format(expert_id)
+                        if pos_sum == 0:
+                            pos_sum += 1
+                        log_info = "expert {}".format(expert_id)
                         for i, count in enumerate(pos_count_list):
-                            log_info += "\t{:.3f}".format(count / pos_sum)
+                            log_info += ",{:.3f}".format(count / pos_sum)
                         logger.info(log_info)
 
 
