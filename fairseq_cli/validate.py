@@ -171,17 +171,16 @@ def main(cfg: DictConfig, override_args=None):
             for layer in model.decoder.layers:
                 if hasattr(layer, "expert_network"):
                     cnt += 1
-                    pos_tensor_list = distributed_utils.all_gather(layer.pos_count, distributed_utils.get_data_parallel_group())
+                    pos_tensor = distributed_utils.all_gather(layer.pos_count, distributed_utils.get_data_parallel_group(), return_tensor=True)
+                    # print(pos_tensor.shape)
+                    pos_sum = torch.sum(pos_tensor, 0, True)
+                    pos_rate_list = (pos_tensor / pos_sum).tolist()
                     logger.info("Base layer {}:".format(cnt))
                     logger.info(header)
-                    for expert_id, t in enumerate(pos_tensor_list):
-                        pos_count_list = t.tolist()
-                        pos_sum = sum(pos_count_list)
-                        if pos_sum == 0:
-                            pos_sum += 1
+                    for expert_id, t in enumerate(pos_rate_list):
                         log_info = "expert {}".format(expert_id)
-                        for i, count in enumerate(pos_count_list):
-                            log_info += ",{:.3f}".format(count / pos_sum)
+                        for i, count in enumerate(t):
+                            log_info += ",{:.3f}".format(count)
                         logger.info(log_info)
 
 
