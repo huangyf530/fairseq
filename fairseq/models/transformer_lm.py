@@ -190,6 +190,9 @@ class TransformerLanguageModelConfig(FairseqDataclass):
     base_shuffle: Optional[int] = field(
         default=1, metadata={"help": "shuffle tokens between workers before computing assignment"}
     )
+    knowledge_layers: Optional[int] = field(
+        default=0, metadata={"help": "number of knowledge layers in total"}
+    )
     # options from other parts of the config
     add_bos_token: bool = II("task.add_bos_token")
     tokens_per_sample: int = II("task.tokens_per_sample")
