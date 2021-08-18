@@ -74,9 +74,14 @@ class MaskedLmLoss(FairseqCriterion):
         knowledge_loss = 0
         for l in knowledge_layer:
             token_num, expert_num = l.knowledge_loss.shape
+            print("know shape", l.knowledge_loss.shape)
+            print("pos shape", sample['net_input']['pos'].shape)
+            print("feature shape", sample['net_input']['src_tokens'].shape)
             kl = l.knowledge_loss.view(sample['net_input']['pos'].shape[:2] + (expert_num,))
-            mask_know_loss = kl[masked_tokens]
-            knowledge_loss += mask_know_loss.sum()
+            # mask_know_loss = kl[masked_tokens]
+            non_mask_know_loss = kl[masked_tokens == False]
+            knowledge_loss += non_mask_know_loss.sum()
+            non_mask_size = (masked_tokens == False).int().sum()
         if not isinstance(knowledge_loss, int):
             syn_loss = (1 - self.knowledge_alpha) * loss + self.knowledge_alpha * knowledge_loss
 
@@ -89,6 +94,7 @@ class MaskedLmLoss(FairseqCriterion):
         if not isinstance(knowledge_loss, int):
             logging_output['syn_loss'] = syn_loss if self.tpu else syn_loss.data
             logging_output['kl_loss'] = knowledge_loss if self.tpu else knowledge_loss.data
+            logging_output['non_mask_size'] = non_mask_size
             return syn_loss, sample_size, logging_output
         return loss, sample_size, logging_output
 
@@ -107,11 +113,12 @@ class MaskedLmLoss(FairseqCriterion):
             "ppl", lambda meters: utils.get_perplexity(meters["loss"].avg)
         )
         if syn_loss_sum > 0:
+            non_mask_size = sum(log.get("non_mask_size", 0) for log in logging_outputs)
             metrics.log_scalar(
                 "syn_loss", syn_loss_sum / sample_size / math.log(2), sample_size, round=3
             )
             metrics.log_scalar(
-                "kl_loss", kl_loss_sum / sample_size / math.log(2), sample_size, round=3
+                "kl_loss", kl_loss_sum / non_mask_size / math.log(2), non_mask_size, round=3
             )
 
     @staticmethod
