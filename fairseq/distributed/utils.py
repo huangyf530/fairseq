@@ -308,6 +308,8 @@ def distributed_init(cfg: FairseqConfig):
 
     if hasattr(cfg,  "model") and getattr(cfg.model, "base_layers", 0) > 0:
         cfg.checkpoint.checkpoint_suffix = f"-rank-{cfg.distributed_training.distributed_rank}"
+    if hasattr(cfg,  "model") and getattr(cfg.model, "knowledge_layers", 0) > 0:
+        cfg.checkpoint.checkpoint_suffix = f"-rank-{cfg.distributed_training.distributed_rank}"
 
     return cfg.distributed_training.distributed_rank
 
