@@ -19,6 +19,9 @@ class RouteLayer(nn.Module):
         self.num_workers = distributed_utils.get_data_parallel_world_size()
         self.isdecoder = hasattr(args, "decoder_embed_dim")
         embed_dim = args.decoder_embed_dim if hasattr(args, "decoder_embed_dim") else args.encoder_embed_dim
+        expert_centroids = torch.empty(self.num_workers, embed_dim)
+        torch.nn.init.orthogonal_(expert_centroids, gain=0.1)
+        self.register_parameter("expert_centroids", torch.nn.Parameter(expert_centroids))
         self.expert_network = nn.Sequential(*([BaseSublayer(args) for _ in range(args.base_sublayers)]))
         self.expert_id = distributed_utils.get_data_parallel_rank()
 
@@ -35,15 +38,19 @@ class RouteLayer(nn.Module):
 
         with torch.no_grad():
             # Compute which token goes to which expert, no need to have grad
-            sort_by_expert, input_splits, output_splits = self.knowledge_assignment(pos)
+            if is_training:
+                sort_by_expert, input_splits, output_splits = self.knowledge_assignment(pos)
+            else:
+                token_expert_affinities = features.matmul(self.expert_centroids.transpose(0, 1))
+                sort_by_expert, input_splits, output_splits = self.greedy_assignment(token_expert_affinities)
         # Swap these tokens for the right ones for our expert
         routed_features = All2All.apply(features[sort_by_expert], output_splits, input_splits)
 
         if routed_features.size(0) > 0:
             # Mix in the expert network based on how appropriate it is for these tokens
-            # alpha = torch.sigmoid(routed_features.mv(self.expert_centroids[self.expert_id])).unsqueeze(1)
-            # routed_features = alpha * self.expert_network(routed_features) + (1 - alpha) * routed_features
-            routed_features = self.expert_network(routed_features)
+            alpha = torch.sigmoid(routed_features.mv(self.expert_centroids[self.expert_id])).unsqueeze(1)
+            routed_features = alpha * self.expert_network(routed_features) + (1 - alpha) * routed_features
+            # routed_features = self.expert_network(routed_features)
         # Return to original worker and ordering
         result = All2All.apply(routed_features, input_splits, output_splits)[self.inverse_sort(sort_by_expert)]
 

@@ -201,7 +201,8 @@ class Trainer(object):
         if (
             self.cfg.distributed_training.ddp_backend == "fully_sharded"
             and self.cfg.distributed_training.use_sharded_state
-        ) or getattr(self.cfg.model, "base_layers", 0) > 0:
+        ) or getattr(self.cfg.model, "base_layers", 0) > 0 \
+        or getattr(self.cfg.model, "knowledge_layers", 0) > 0:
             return True
         else:
             return self.is_data_parallel_master
