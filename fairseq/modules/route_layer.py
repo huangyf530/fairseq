@@ -28,6 +28,9 @@ class RouteLayer(nn.Module):
         # Add a special attribute to the expert parameters, so we know not to sync their gradients
         for param in self.expert_network.parameters():
             param.expert = True
+        
+        self.each_expert_count = torch.zeros(self.num_workers, dtype=torch.int64)
+        self.pos_count = torch.zeros(16, dtype=torch.int64)  # need modify to be more flexible
 
     def forward(self, input_features, *args, **kwargs):
         features = input_features.reshape(-1, input_features.size(-1))
@@ -45,6 +48,21 @@ class RouteLayer(nn.Module):
                 sort_by_expert, input_splits, output_splits = self.greedy_assignment(token_expert_affinities)
         # Swap these tokens for the right ones for our expert
         routed_features = All2All.apply(features[sort_by_expert], output_splits, input_splits)
+        if not is_training:
+            # count load balance in valid dataset
+            my_token_num = routed_features.shape[0]
+            each_token_num = torch.zeros(self.num_workers, dtype=torch.int64, device=features.device)
+            each_token_num[self.expert_id] = my_token_num
+            each_token_num = distributed_utils.all_reduce(each_token_num,
+                        group=distributed_utils.get_data_parallel_group())
+            # torch.distributed.all_reduce(each_token_num, op=torch.distributed.ReduceOp.SUM)
+            self.each_expert_count += each_token_num.to(self.each_expert_count.device)
+            if pos is not None:
+                # pos count in each expert
+                routed_pos = All2All.apply(pos[sort_by_expert], output_splits, input_splits)
+                pos_type, pos_count = torch.unique(routed_pos, return_counts=True)
+                self.pos_count = self.pos_count.to(routed_features.device)
+                self.pos_count[pos_type] += pos_count
 
         if routed_features.size(0) > 0:
             # Mix in the expert network based on how appropriate it is for these tokens
